@@ -15,11 +15,6 @@ variables:
 
 steps:
 
-# Checking whether terraform still present
-- script: |
-    which terraform
-    terraform version
-  displayName: Check Terraform
 
 # Install Terraform
 - script: |
