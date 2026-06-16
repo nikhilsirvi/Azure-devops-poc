@@ -4,7 +4,7 @@ data "archive_file" "lambda_zip" {
 
   source_dir = "${path.module}/../../../Lambda/test-function"
 
-  output_path = "${path.module}/../../../Lambda/test-function/app.zip"
+  output_path = "${path.module}/../../../Lambda/test-function/app.zip" 
 }
 
 resource "aws_lambda_function" "lambda" {
