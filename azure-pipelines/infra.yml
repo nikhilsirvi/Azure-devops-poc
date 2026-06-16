@@ -18,14 +18,21 @@ steps:
 
 # Install Terraform
 - script: |
-    wget -q https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_linux_amd64.zip
+    pwd
+
+    wget https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_linux_amd64.zip
 
     unzip -o terraform_1.9.8_linux_amd64.zip
 
-    chmod +x terraform
+    echo "Files after unzip:"
+    ls -la
 
-    ./terraform version
-  displayName: Install Terraform
+    file terraform || true
+
+    chmod +x terraform || true
+
+    ./terraform version || true
+  displayName: Debug Terraform Install
 
 # Verify AWS OIDC Authentication
 - task: AWSCLI@1
