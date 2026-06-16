@@ -1,6 +1,6 @@
 module "iam" {
 
-  source = "./modules/iam/lambda-role"
+  source = "./modules/IAM/lambda-role"
 
   role_name = "${local.name_prefix}-lambda-role-${var.environment}"
 

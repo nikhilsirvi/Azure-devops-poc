@@ -36,6 +36,12 @@ steps:
     awsCommand: sts
     awsSubCommand: get-caller-identity
 
+# debug folder structure
+- script: |
+    pwd
+    find . -type d | sort
+  displayName: Show Folder Structure
+
 # Terraform Init
 - script: |
     terraform init
