@@ -11,4 +11,4 @@ locals {
     ManagedBy   = "Terraform"
     Deployment  = "IaC"
   }
-}
+} 
