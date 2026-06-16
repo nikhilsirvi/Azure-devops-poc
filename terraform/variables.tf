@@ -23,5 +23,5 @@ variable "lambda_handler" {
 }
 
 variable "lambda_zip_path" {
-  type = string
+  type = string 
 }
