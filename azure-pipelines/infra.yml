@@ -16,23 +16,16 @@ variables:
 steps:
 
 
-# Install Terraform
+#install terraform
 - script: |
-    pwd
-
-    wget https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_linux_amd64.zip
+    wget -q https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_linux_amd64.zip
 
     unzip -o terraform_1.9.8_linux_amd64.zip
 
-    echo "Files after unzip:"
-    ls -la
+    sudo mv -f terraform /usr/local/bin/
 
-    file terraform || true
-
-    chmod +x terraform || true
-
-    ./terraform version || true
-  displayName: Debug Terraform Install
+    terraform version
+  displayName: Install Terraform
 
 # Verify AWS OIDC Authentication
 - task: AWSCLI@1
