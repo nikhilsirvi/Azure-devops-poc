@@ -39,29 +39,29 @@ steps:
 # Terraform Init
 - script: |
     terraform init
-  workingDirectory: terraform
+  workingDirectory: terraform-infra
   displayName: Terraform Init
 
 # Terraform Format Check
 - script: |
     terraform fmt -check -recursive
-  workingDirectory: terraform
+  workingDirectory: terraform-infra
   displayName: Terraform Format Check
 
 # Terraform Validate
 - script: |
     terraform validate
-  workingDirectory: terraform
+  workingDirectory: terraform-infra
   displayName: Terraform Validate
 
 # Terraform Plan
 - script: |
     terraform plan -out=tfplan
-  workingDirectory: terraform
+  workingDirectory: terraform-infra
   displayName: Terraform Plan
 
 # Terraform Apply
 - script: |
     terraform apply -auto-approve tfplan
-  workingDirectory: terraform
+  workingDirectory: terraform-infra
   displayName: Terraform Apply
