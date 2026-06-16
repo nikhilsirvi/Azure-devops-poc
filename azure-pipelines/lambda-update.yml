@@ -29,6 +29,7 @@ steps:
   displayName: Build Lambda Package
 
 - task: AWSCLI@1
+  displayName: Test OIDC Identity
   inputs:
     awsCredentials: aws-odic-sc
     regionName: $(AWS_REGION)
