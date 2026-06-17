@@ -1,6 +1,6 @@
 aws_region       = "ca-central-1"
 environment      = "qa"
-application_name = "cst"
+application_name = "mdt-cst-gaitway"
 owner            = "devops-team"
 
 lambda_runtime = "python3.12"
