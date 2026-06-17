@@ -56,18 +56,34 @@ steps:
 
 # Terraform Plan
 - task: AWSShellScript@1
+  displayName: Terraform Plan
   inputs:
     awsCredentials: aws-odic-sc
     regionName: $(AWS_REGION)
     scriptType: inline
     inlineScript: |
-      terraform plan
+      cd terraform-infra
+
+      terraform plan \
+        -out=tfplan \
+        -input=false
+  env:
+    AWS_REGION: $(AWS_REGION)
 
 # Terraform Apply
-- task: AWSShellScript@1  #This runs Terraform inside the authenticated AWS session.
+- task: AWSShellScript@1
+  displayName: Terraform Apply
   inputs:
     awsCredentials: aws-odic-sc
     regionName: $(AWS_REGION)
     scriptType: inline
     inlineScript: |
-      terraform apply -auto-approve tfplan
+      cd terraform-infra
+
+      terraform apply \
+        -auto-approve \
+        -input=false \
+        tfplan
+  env:
+    AWS_REGION: $(AWS_REGION)
+ 
