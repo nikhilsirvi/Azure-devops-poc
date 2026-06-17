@@ -36,12 +36,6 @@ steps:
     awsCommand: sts
     awsSubCommand: get-caller-identity
 
-# debug folder structure
-- script: |
-    pwd
-    find . -type d | sort
-  displayName: Show Folder Structure
-
 # Terraform Init
 - script: |
     terraform init
@@ -61,13 +55,19 @@ steps:
   displayName: Terraform Validate
 
 # Terraform Plan
-- script: |
-    terraform plan -out=tfplan
-  workingDirectory: terraform-infra
-  displayName: Terraform Plan
+- task: AWSShellScript@1
+  inputs:
+    awsCredentials: aws-odic-sc
+    regionName: $(AWS_REGION)
+    scriptType: inline
+    inlineScript: |
+      terraform plan
 
 # Terraform Apply
-- script: |
-    terraform apply -auto-approve tfplan
-  workingDirectory: terraform-infra
-  displayName: Terraform Apply
+- task: AWSShellScript@1  #This runs Terraform inside the authenticated AWS session.
+  inputs:
+    awsCredentials: aws-odic-sc
+    regionName: $(AWS_REGION)
+    scriptType: inline
+    inlineScript: |
+      terraform apply -auto-approve tfplan
