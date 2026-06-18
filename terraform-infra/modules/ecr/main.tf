@@ -1,6 +1,3 @@
-terraform {
-  backend "s3" {}
-}
 
 resource "aws_ecr_repository" "this" {
   name                 = var.name

@@ -1,156 +1,110 @@
-# ---------------- VPC ----------------
+// VPC 
 resource "aws_vpc" "this" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-  tags = merge(var.tags, {
-    Name = "${var.name_prefix}-${var.vpc_name}-vpc"
-  })
+  tags = merge(
+    var.tags,
+    {
+      Name = "${var.project_name}-${var.environment}-vpc"
+    }
+  )
 }
 
-# ---------------- Internet Gateway ----------------
+//InterNet Gaitway
 resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.this.id
 
-  tags = merge(var.tags, {
-    Name = "${var.name_prefix}-igw"
-  })
+  tags = {
+    Name = "${var.project_name}-${var.environment}-igw"
+  }
 }
 
-# ---------------- Public Subnets ----------------
+
+// public subnets
 resource "aws_subnet" "public" {
-  for_each = var.public_subnets
+  count = length(var.public_subnet_cidrs)
 
   vpc_id                  = aws_vpc.this.id
-  cidr_block              = each.value
-  availability_zone       = each.key
+  cidr_block              = var.public_subnet_cidrs[count.index]
+  availability_zone       = var.availability_zones[count.index]
   map_public_ip_on_launch = true
 
-  tags = merge(var.tags, {
-    Name = "${var.name_prefix}-public-${each.key}"
-    Tier = "public"
-  })
+  tags = {
+    Name = "${var.project_name}-${var.environment}-public-${count.index + 1}"
+  }
 }
 
-# Public route table (ONE for all public subnets)
+
+// private subnets
+resource "aws_subnet" "private" {
+  count = length(var.private_subnet_cidrs)
+
+  vpc_id            = aws_vpc.this.id
+  cidr_block        = var.private_subnet_cidrs[count.index]
+  availability_zone = var.availability_zones[count.index]
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-private-${count.index + 1}"
+  }
+}
+
+// Public route table
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.this.id
 
-  tags = merge(var.tags, {
-    Name = "${var.name_prefix}-public-rt"
-  })
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.this.id
+  }
 }
 
-resource "aws_route" "public_internet_access" {
-  route_table_id         = aws_route_table.public.id
-  destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.this.id
-}
 
+//Public Route Association
 resource "aws_route_table_association" "public" {
-  for_each       = aws_subnet.public
-  subnet_id      = each.value.id
+  count = length(aws_subnet.public)
+
+  subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
 }
 
-# ---------------- NAT Gateway ----------------
+// Elastic IP
 resource "aws_eip" "nat" {
-  count      = var.enable_nat_gateway ? (var.single_nat_gateway ? 1 : length(var.private_subnets)) : 0
-  depends_on = [aws_internet_gateway.this]
+  count = var.enable_nat_gateway ? length(var.public_subnet_cidrs) : 0
 
-  tags = merge(var.tags, {
-    Name = "${var.name_prefix}-nat-eip-${count.index + 1}"
-  })
+  domain = "vpc"
 }
 
+// NAT Gaitway
 resource "aws_nat_gateway" "this" {
-  count = var.enable_nat_gateway ? (var.single_nat_gateway ? 1 : length(var.private_subnets)) : 0
+  count = var.enable_nat_gateway ? length(var.public_subnet_cidrs) : 0
 
   allocation_id = aws_eip.nat[count.index].id
-  subnet_id     = values(aws_subnet.public)[0].id # always place in 1st public subnet for single NAT
+  subnet_id     = aws_subnet.public[count.index].id
 
-  tags = merge(var.tags, {
-    Name = "${var.name_prefix}-nat-${count.index + 1}"
-  })
+  depends_on = [
+    aws_internet_gateway.this
+  ]
 }
 
-# ---------------- Private Subnets ----------------
-resource "aws_subnet" "private" {
-  for_each = var.private_subnets
-
-  vpc_id            = aws_vpc.this.id
-  cidr_block        = each.value
-  availability_zone = each.key
-
-  tags = merge(var.tags, {
-    Name = "${var.name_prefix}-private-${each.key}"
-    Tier = "private"
-  })
-}
-
-# ONE private route table for all private subnets
+// Private route table
 resource "aws_route_table" "private" {
-  count  = length(var.private_subnets) > 0 ? 1 : 0
+  count = length(var.private_subnet_cidrs)
+
   vpc_id = aws_vpc.this.id
 
-  tags = merge(var.tags, {
-    Name = "${var.name_prefix}-private-rt"
-  })
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.this[count.index].id
+  }
 }
 
-resource "aws_route" "private_nat_gateway" {
-  count                  = var.enable_nat_gateway && length(var.private_subnets) > 0 ? 1 : 0
-  route_table_id         = aws_route_table.private[0].id
-  destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.this[0].id
-}
-
+// route association
 resource "aws_route_table_association" "private" {
-  for_each       = aws_subnet.private
-  subnet_id      = each.value.id
-  route_table_id = aws_route_table.private[0].id
+  count = length(var.private_subnet_cidrs)
+
+  subnet_id      = aws_subnet.private[count.index].id
+  route_table_id = aws_route_table.private[count.index].id
 }
 
-# ---------------- Security Group ----------------
-resource "aws_security_group" "sg" {
-  name        = "${var.name_prefix}-${var.sg_name}"
-  description = var.sg_description
-  vpc_id      = aws_vpc.this.id
-
-  dynamic "ingress" {
-    for_each = var.sg_ingress_rules
-    content {
-      description = lookup(ingress.value, "description", null)
-      from_port   = ingress.value.from_port
-      to_port     = ingress.value.to_port
-      protocol    = ingress.value.protocol
-      cidr_blocks = lookup(ingress.value, "cidr_blocks", null)
-      ipv6_cidr_blocks = lookup(ingress.value, "ipv6_cidr_blocks", null)
-      security_groups  = lookup(ingress.value, "security_groups", null)
-      self             = lookup(ingress.value, "self", null)
-    }
-  }
-
-  dynamic "egress" {
-    for_each = var.sg_egress_rules
-    content {
-      description = lookup(egress.value, "description", null)
-      from_port   = egress.value.from_port
-      to_port     = egress.value.to_port
-      protocol    = egress.value.protocol
-      cidr_blocks = lookup(egress.value, "cidr_blocks", null)
-      ipv6_cidr_blocks = lookup(egress.value, "ipv6_cidr_blocks", null)
-      security_groups  = lookup(egress.value, "security_groups", null)
-      self             = lookup(egress.value, "self", null)
-    }
-  }
-
-  tags = merge(var.tags, {
-    Name = "${var.name_prefix}-${var.sg_name}"
-  })
-}
-
-terraform {
-  backend "s3" {}
-}

@@ -23,10 +23,39 @@ variable "lambda_zip_path" {
 variable "aws_region" {
   type        = string
   description = "AWS region where all resources will be deployed"
-  default     = "ca-central-1"
+  default     = "us-west-2"
 }
 
 variable "environment" {
   type        = string
   description = "Deployment environment name (e.g. dev, qa, prod)"
+}
+
+
+variable "vpc_id" {
+  type = string
+}
+
+variable "private_subnets" {
+  type = list(string)
+}
+
+variable "alb_sg" {
+  type = string
+}
+
+variable "ecs_sg" {
+  type = string
+}
+
+variable "namespace" {
+  type = string
+}
+
+variable "secret_arn" {
+  type = string
+}
+
+variable "account_id" {
+  type = string
 }

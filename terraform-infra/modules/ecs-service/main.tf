@@ -1,6 +1,4 @@
-terraform {
-  backend "s3" {}
-}
+
 
 resource "aws_ecs_task_definition" "this" {
   family                   = var.name
@@ -32,83 +30,11 @@ resource "aws_ecs_task_definition" "this" {
         logDriver = "awslogs"
         options = {
           awslogs-group         = "/ecs/dev-backend"
-          awslogs-region        = "ap-southeast-1"
+          awslogs-region        = "ca-central-1"
           awslogs-stream-prefix = "ecs"
         }
       }
-      # ---------------------------
-      # NORMAL ENV VARIABLES (SSM)
-      # ---------------------------
-      environment = [
-        {
-          name  = "MAIN_SERVER_URL"
-          value = "http://localhost:8000"
-        },
-        {
-          name  = "RIG_NAME"
-          value = "panacea_rig_01"
-        }
-      ]
-
-      # ---------------------------
-      # SECRETS (SSM + Secrets Manager)
-      # ---------------------------
-      secrets = [
-        {
-          name      = "DATABASE_URL"
-          valueFrom = "${var.secret_arn}:DATABASE_URL::"
-        },
-        {
-          name      = "SECRET_KEY"
-          valueFrom = "${var.secret_arn}:SECRET_KEY::"
-        },
-        {
-          name      = "COGNITO_CLIENT_SECRET"
-          valueFrom = "${var.secret_arn}:COGNITO_CLIENT_SECRET::"
-        },
-        {
-          name      = "CORS_ORIGINS"
-          valueFrom = "${var.secret_arn}:CORS_ORIGINS::"
-        },
-
-        # SSM PARAMETERS
-        {
-          name      = "AUTH_PROVIDER"
-          valueFrom = "arn:aws:ssm:${var.region}:${var.account_id}:parameter/backend/dev/AUTH_PROVIDER"
-        },
-        {
-          name      = "COGNITO_USER_POOL_ID"
-          valueFrom = "arn:aws:ssm:${var.region}:${var.account_id}:parameter/backend/dev/COGNITO_USER_POOL_ID"
-        },
-        {
-          name      = "COGNITO_CLIENT_ID"
-          valueFrom = "arn:aws:ssm:${var.region}:${var.account_id}:parameter/backend/dev/COGNITO_CLIENT_ID"
-        },
-        {
-          name      = "COGNITO_REGION"
-          valueFrom = "arn:aws:ssm:${var.region}:${var.account_id}:parameter/backend/dev/COGNITO_REGION"
-        },
-        {
-          name      = "TEMP_TOKEN_EXPIRE_MINUTES"
-          valueFrom = "arn:aws:ssm:${var.region}:${var.account_id}:parameter/backend/dev/TEMP_TOKEN_EXPIRE_MINUTES"
-        },
-        {
-          name      = "SYNC_INTERVAL_SECONDS"
-          valueFrom = "arn:aws:ssm:${var.region}:${var.account_id}:parameter/backend/dev/SYNC_INTERVAL_SECONDS"
-        },
-        {
-          name      = "CONFIG_REFRESH_INTERVAL_SECONDS"
-          valueFrom = "arn:aws:ssm:${var.region}:${var.account_id}:parameter/backend/dev/CONFIG_REFRESH_INTERVAL_SECONDS"
-        },
-        {
-          name      = "REQUEST_TIMEOUT"
-          valueFrom = "arn:aws:ssm:${var.region}:${var.account_id}:parameter/backend/dev/REQUEST_TIMEOUT"
-        },
-        {
-          name      = "RIG_SERVER_PORT"
-          valueFrom = "arn:aws:ssm:${var.region}:${var.account_id}:parameter/backend/dev/RIG_SERVER_PORT"
-        }
-      ]
+    
     }
   ])
 }

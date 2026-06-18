@@ -1,6 +1,3 @@
-terraform {
-  backend "s3" {}
-}
 
 resource "aws_ecs_cluster" "this" {
   name = var.name
