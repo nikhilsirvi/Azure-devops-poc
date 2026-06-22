@@ -41,13 +41,13 @@ stages:
 
           # Install Dependencies
           - script: |
-              cd frontend
+              cd mdt-gtw-analytics-frontend
               npm ci
             displayName: "Install Dependencies"
 
           # Build React/Vite App
           - script: |
-              cd frontend
+              cd mdt-gtw-analytics-frontend
               npm run build
             displayName: "Build Frontend"
 
