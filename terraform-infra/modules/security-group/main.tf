@@ -4,7 +4,7 @@ resource "aws_security_group" "this" {
   vpc_id      = var.vpc_id
 
   tags = {
-    Name = var.name
+    Name = "${var.name}-SG"
   }
 }
 
@@ -22,7 +22,8 @@ resource "aws_vpc_security_group_ingress_rule" "this" {
   to_port     = each.value.to_port
   ip_protocol = each.value.protocol
 
-  cidr_ipv4 = each.value.cidr
+  cidr_ipv4                    = try(each.value.cidr, null)
+  referenced_security_group_id = try(each.value.source_sg_id, null)
 }
 
 // Dynamic Egress
@@ -34,9 +35,10 @@ resource "aws_vpc_security_group_egress_rule" "this" {
 
   security_group_id = aws_security_group.this.id
 
-  from_port   = each.value.from_port
-  to_port     = each.value.to_port
   ip_protocol = each.value.protocol
+
+  from_port = each.value.protocol == "-1" ? null : each.value.from_port
+  to_port   = each.value.protocol == "-1" ? null : each.value.to_port
 
   cidr_ipv4 = each.value.cidr
 }

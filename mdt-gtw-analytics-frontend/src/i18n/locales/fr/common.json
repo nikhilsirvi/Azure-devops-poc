@@ -1,0 +1,26 @@
+{
+  "app": {
+    "name": "Modèle d'Application React",
+    "tagline": "Construisez vite, livrez en confiance"
+  },
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "settings": "Paramètres"
+  },
+  "actions": {
+    "goHome": "Retour à l'accueil",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "refresh": "Actualiser"
+  },
+  "errors": {
+    "notFound": "Page introuvable",
+    "notFoundMessage": "La page que vous recherchez n'existe pas.",
+    "generic": "Une erreur s'est produite.",
+    "retry": "Veuillez réessayer."
+  },
+  "loading": "Chargement...",
+  "noData": "Aucune donnée disponible"
+}

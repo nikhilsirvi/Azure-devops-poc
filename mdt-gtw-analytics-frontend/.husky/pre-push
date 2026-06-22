@@ -1,0 +1,5 @@
+echo "Running tests before push..."
+npm run test:ci
+
+echo "Checking for high/critical vulnerabilities..."
+npm run audit:ci

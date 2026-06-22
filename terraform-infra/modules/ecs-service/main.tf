@@ -1,7 +1,11 @@
-
+// cloudwatch logs for taks
+# resource "aws_cloudwatch_log_group" "ecs" {
+#   name              = "/ecs/dev-backend"
+#   retention_in_days = 14
+# }
 
 resource "aws_ecs_task_definition" "this" {
-  family                   = var.name
+  family                   = "${var.name}-tf"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
 
@@ -19,28 +23,29 @@ resource "aws_ecs_task_definition" "this" {
       portMappings = [
         {
           name          = "app"
-          containerPort = 8000
+          containerPort = 3000
           protocol      = "tcp"
         }
       ]
 
       essential = true
 
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          awslogs-group         = "/ecs/dev-backend"
-          awslogs-region        = "ca-central-1"
-          awslogs-stream-prefix = "ecs"
-        }
-      }
+      // Currently don't have access to push logs on cloudwatch
+      # logConfiguration = {
+      #   logDriver = "awslogs"
+      #   options = {
+      #     awslogs-group         = "/ecs/dev-backend"
+      #     awslogs-region        = "us-west-2"
+      #     awslogs-stream-prefix = "ecs"
+      #   }
+      # }
     
     }
   ])
 }
 
 resource "aws_ecs_service" "this" {
-  name            = var.name
+  name            = "${var.name}-service"
   cluster         = var.cluster_id
   task_definition = aws_ecs_task_definition.this.arn
   desired_count   = 1
@@ -56,23 +61,23 @@ resource "aws_ecs_service" "this" {
   load_balancer {
     target_group_arn = var.target_group_arn
     container_name   = "app"
-    container_port   = 8000
+    container_port   = 3000
   }
 
-  service_connect_configuration {
-    enabled   = true
-    namespace = var.namespace
+  # service_connect_configuration {
+  #   enabled   = true
+  #   namespace = var.namespace
 
-    service {
-      port_name      = "app"
-      discovery_name = var.name
+  #   service {
+  #     port_name      = "app"
+  #     discovery_name = var.name
 
-      client_alias {
-        port     = 8000
-        dns_name = var.name
-      }
-    }
-  }
+  #     client_alias {
+  #       port     = 8000
+  #       dns_name = var.name
+  #     }
+  #   }
+  # }
 
   depends_on = [var.listener_arn]
 }

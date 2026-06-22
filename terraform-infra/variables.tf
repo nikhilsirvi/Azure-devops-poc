@@ -31,15 +31,6 @@ variable "environment" {
   description = "Deployment environment name (e.g. dev, qa, prod)"
 }
 
-
-variable "vpc_id" {
-  type = string
-}
-
-variable "private_subnets" {
-  type = list(string)
-}
-
 variable "alb_sg" {
   type = string
 }

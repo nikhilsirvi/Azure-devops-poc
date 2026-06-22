@@ -1,5 +1,5 @@
 aws_region       = "us-west-2"
-environment      = "qa"
+environment      = "dev"
 application_name = "mdt-cst-gaitway"
 owner            = "devops-team"
 
@@ -9,12 +9,6 @@ lambda_handler = "app.lambda_handler"
 lambda_zip_path = "../Lambda/test-function/app.zip"
 
 
-vpc_id = "vpc-123456789"
-
-private_subnets = [
-  "subnet-111111",
-  "subnet-222222"
-]
 
 alb_sg = "sg-111111"
 
