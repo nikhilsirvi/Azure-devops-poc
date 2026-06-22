@@ -39,16 +39,24 @@ stages:
               npm -v
             displayName: "Verify Node Version"
 
+          # install npmp
+          - script: |
+              npm install -g pnpm
+              displayName: Install PNPM
+
+        
           # Install Dependencies
           - script: |
               cd mdt-gtw-analytics-frontend
-              npm ci
+              pnpm install --frozen-lockfile
+             # npm ci 
             displayName: "Install Dependencies"
 
           # Build React/Vite App
           - script: |
               cd mdt-gtw-analytics-frontend
-              npm run build
+              pnpm run build
+            # npm run build
             displayName: "Build Frontend"
 
           # Configure AWS Credentials
