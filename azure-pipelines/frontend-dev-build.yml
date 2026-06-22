@@ -42,11 +42,13 @@ stages:
          
           # Install Dependencies
           - script: |
+              cd mdt-gtw-analytics-frontend
               npm install --force
             displayName: 'Install Dependencies'
 
           # Build React/Vite App
           - script: |
+              cd mdt-gtw-analytics-frontend
               echo "Cleaning previous build..."
               rm -rf dist/
               rm -rf node_modules/.cache/
@@ -72,7 +74,7 @@ stages:
               regionName: "$(AWS_REGION)"
               awsCommand: "s3"
               awsSubCommand: "sync"
-              awsArguments: "frontend/dist s3://$(S3_BUCKET) --delete"
+              awsArguments: "mdt-gtw-analytics-frontend/dist s3://$(S3_BUCKET) --delete"
 
           # CloudFront Cache Invalidation
           - task: AWSCLI@1
