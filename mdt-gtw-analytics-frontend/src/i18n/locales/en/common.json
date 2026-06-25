@@ -1,0 +1,26 @@
+{
+  "app": {
+    "name": "React App Template",
+    "tagline": "Build fast, ship confident"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "settings": "Settings"
+  },
+  "actions": {
+    "goHome": "Go Home",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "refresh": "Refresh"
+  },
+  "errors": {
+    "notFound": "Page not found",
+    "notFoundMessage": "The page you are looking for does not exist.",
+    "generic": "Something went wrong.",
+    "retry": "Please try again."
+  },
+  "loading": "Loading...",
+  "noData": "No data available"
+}

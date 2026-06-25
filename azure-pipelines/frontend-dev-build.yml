@@ -1,0 +1,87 @@
+trigger:
+  branches:
+    include:
+      - develop
+
+  paths:
+    include:
+      - mdt-gtw-analytics-frontend/*
+      - mdt-gtw-analytics-frontend/**
+ 
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - group: frontend-dev
+
+stages:
+  - stage: BuildAndDeploy
+    displayName: Build and Deploy Frontend
+
+    jobs:
+      - job: FrontendDeploy
+        displayName: Deploy Frontend to S3
+
+        steps:
+
+          # Checkout Repository
+          - checkout: self
+
+          # Install Node
+          - task: NodeTool@0
+            inputs:
+              versionSpec: "$(NODE_VERSION)"
+            displayName: "Install Node.js"
+
+          # Verify Node Version
+          - script: |
+              node -v
+              npm -v
+            displayName: "Verify Node Version"
+
+         
+          # Install Dependencies
+          - script: |
+              cd mdt-gtw-analytics-frontend
+              npm install --force
+            displayName: 'Install Dependencies'
+
+          # Build React/Vite App
+          - script: |
+              cd mdt-gtw-analytics-frontend
+              echo "Cleaning previous build..."
+              rm -rf dist/
+              rm -rf node_modules/.cache/
+
+              echo "Building application..."
+              npm run build
+            displayName: 'Build Frontend'
+
+          # Configure AWS Credentials
+          - task: AWSCLI@1
+            displayName: "Verify AWS Access"
+            inputs:
+              awsCredentials: "aws-odic-sc"
+              regionName: "$(AWS_REGION)"
+              awsCommand: "sts"
+              awsSubCommand: "get-caller-identity"
+
+          # Upload Build Files
+          - task: AWSCLI@1
+            displayName: "Deploy to S3"
+            inputs:
+              awsCredentials: "aws-odic-sc"
+              regionName: "$(AWS_REGION)"
+              awsCommand: "s3"
+              awsSubCommand: "sync"
+              awsArguments: "mdt-gtw-analytics-frontend/dist s3://$(S3_BUCKET) --delete"
+
+          # CloudFront Cache Invalidation
+          - task: AWSCLI@1
+            displayName: "Invalidate CloudFront Cache"
+            inputs:
+              awsCredentials: "aws-odic-sc"
+              regionName: "$(AWS_REGION)"
+              awsCommand: "cloudfront"
+              awsSubCommand: "create-invalidation"
+              awsArguments: '--distribution-id $(CLOUDFRONT_DISTRIBUTION_ID) --paths "/*"'

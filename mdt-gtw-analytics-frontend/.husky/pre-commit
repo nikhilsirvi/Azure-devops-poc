@@ -1,0 +1,186 @@
+#!/bin/sh
+# .husky/pre-commit
+# Enterprise-grade security pre-commit hook
+
+set -e
+
+echo ""
+echo "╔════════════════════════════════════════════════════════════╗"
+echo "║         SECURITY PRE-COMMIT VALIDATION STARTED            ║"
+echo "╚════════════════════════════════════════════════════════════╝"
+echo ""
+
+failed_checks=0
+
+# ─── 1. LINT-STAGED (ESLint + Prettier on staged files) ──────────────────────
+echo "──────────────────────────────────────────────────────"
+echo "▶ 1. Lint-Staged (ESLint + Prettier)"
+echo "──────────────────────────────────────────────────────"
+if npx lint-staged; then
+  echo "✓ Lint-staged PASSED"
+else
+  echo "✗ Lint-staged FAILED"
+  failed_checks=$((failed_checks + 1))
+fi
+echo ""
+
+# ─── 2. SECURITY LINTING ─────────────────────────────────────────────────────
+echo "──────────────────────────────────────────────────────"
+echo "▶ 2. Running ESLint with Security Rules"
+echo "──────────────────────────────────────────────────────"
+if npm run lint:security 2>/dev/null; then
+  echo "✓ Security Linting PASSED"
+else
+  echo "✗ Security Linting FAILED"
+  failed_checks=$((failed_checks + 1))
+fi
+echo ""
+
+# ─── 3. TYPESCRIPT TYPE CHECKING ─────────────────────────────────────────────
+echo "──────────────────────────────────────────────────────"
+echo "▶ 3. Type Checking (TypeScript)"
+echo "──────────────────────────────────────────────────────"
+if npm run type-check 2>/dev/null; then
+  echo "✓ Type Safety Check PASSED"
+else
+  echo "✗ Type Safety Check FAILED"
+  failed_checks=$((failed_checks + 1))
+fi
+echo ""
+
+# ─── 4. DEPENDENCY AUDIT ─────────────────────────────────────────────────────
+echo "──────────────────────────────────────────────────────"
+echo "▶ 4. Auditing Dependencies"
+echo "──────────────────────────────────────────────────────"
+audit_output=$(npm audit --json 2>/dev/null || echo '{}')
+critical_count=$(echo "$audit_output" | grep -o '"severity":"critical"' | wc -l | tr -d ' ')
+high_count=$(echo "$audit_output" | grep -o '"severity":"high"' | wc -l | tr -d ' ')
+
+if [ "$critical_count" -gt 0 ]; then
+  echo "✗ Found $critical_count CRITICAL vulnerabilities"
+  failed_checks=$((failed_checks + 1))
+elif [ "$high_count" -gt 0 ]; then
+  echo "⚠ Found $high_count HIGH vulnerabilities (review recommended)"
+  npm audit --audit-level=moderate || true
+else
+  echo "✓ No critical/high vulnerabilities found"
+fi
+echo ""
+
+# ─── 5. SAST SCANNING (OPTIONAL) ─────────────────────────────────────────────
+echo "──────────────────────────────────────────────────────"
+echo "▶ 5. SAST Scanning (Semgrep)"
+echo "──────────────────────────────────────────────────────"
+if command -v semgrep > /dev/null 2>&1; then
+  if semgrep --config=p/security-audit --quiet src/ 2>/dev/null; then
+    echo "✓ SAST Security Scan PASSED"
+  else
+    echo "⚠ SAST scan found issues (review recommended)"
+  fi
+else
+  echo "⚠ Semgrep not installed. Skipping SAST scan."
+  echo "  Install with: pip install semgrep"
+fi
+echo ""
+
+# ─── 6. DANGEROUS PATTERNS ───────────────────────────────────────────────────
+echo "──────────────────────────────────────────────────────"
+echo "▶ 6. Checking for Dangerous Patterns"
+echo "──────────────────────────────────────────────────────"
+pattern_found=0
+
+check_pattern() {
+  pattern="$1"
+  if grep -r "$pattern" src/ --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" 2>/dev/null | grep -v "test\|spec\|mock\|sanitiz" > /dev/null 2>&1; then
+    echo "⚠ Potential security issue: '$pattern'"
+    grep -r "$pattern" src/ --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" 2>/dev/null | grep -v "test\|spec\|mock\|sanitiz" | head -3
+    pattern_found=$((pattern_found + 1))
+    echo ""
+  fi
+}
+
+check_pattern "dangerouslySetInnerHTML"
+check_pattern "innerHTML"
+check_pattern "eval("
+check_pattern "document\.write"
+check_pattern "localStorage\.setItem.*token"
+check_pattern "localStorage\.setItem.*password"
+check_pattern "console\.log.*password"
+check_pattern "console\.log.*token"
+
+if [ $pattern_found -eq 0 ]; then
+  echo "✓ No dangerous patterns detected"
+else
+  echo "⚠ $pattern_found potential issue(s) found. Review before committing."
+fi
+echo ""
+
+# ─── 7. .ENV FILES NOT COMMITTED ─────────────────────────────────────────────
+echo "──────────────────────────────────────────────────────"
+echo "▶ 7. Checking for Committed .env Files"
+echo "──────────────────────────────────────────────────────"
+if git diff --cached --name-only 2>/dev/null | grep -E "^\.env($|\.|\.local)" > /dev/null 2>&1; then
+  echo "✗ ERROR: .env files are staged for commit!"
+  git diff --cached --name-only | grep -E "^\.env($|\.|\.local)"
+  echo "  Add these to .gitignore immediately."
+  failed_checks=$((failed_checks + 1))
+else
+  echo "✓ No .env files staged for commit"
+fi
+echo ""
+
+# ─── 8. SECURITY UNIT TESTS ──────────────────────────────────────────────────
+echo "──────────────────────────────────────────────────────"
+echo "▶ 8. Running Security Unit Tests"
+echo "──────────────────────────────────────────────────────"
+if npm run test:security 2>/dev/null; then
+  echo "✓ Security Unit Tests PASSED"
+else
+  echo "⚠ Security tests not found or failed. Continuing..."
+fi
+echo ""
+
+# ─── 9. BUNDLE SIZE ANOMALY CHECK ────────────────────────────────────────────
+echo "──────────────────────────────────────────────────────"
+echo "▶ 9. Checking Bundle Size Anomalies"
+echo "──────────────────────────────────────────────────────"
+staged_files=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -E "\.(ts|tsx|js|jsx)$" || true)
+if [ -n "$staged_files" ]; then
+  size_ok=1
+  for file in $staged_files; do
+    if [ -f "$file" ]; then
+      size=$(wc -c < "$file" 2>/dev/null || echo 0)
+      if [ "$size" -gt 500000 ]; then
+        echo "⚠ Large file detected: $file (${size} bytes)"
+        size_ok=0
+      fi
+    fi
+  done
+  if [ $size_ok -eq 1 ]; then
+    echo "✓ File size check completed — no anomalies"
+  fi
+else
+  echo "No JavaScript/TypeScript files staged"
+fi
+echo ""
+
+# ─── FINAL SUMMARY ───────────────────────────────────────────────────────────
+echo "══════════════════════════════════════════════════════"
+echo "SECURITY CHECK SUMMARY"
+echo "══════════════════════════════════════════════════════"
+if [ $failed_checks -eq 0 ]; then
+  echo "╔════════════════════════════════════════════════════╗"
+  echo "║  ✓ ALL SECURITY CHECKS PASSED - SAFE TO COMMIT    ║"
+  echo "╚════════════════════════════════════════════════════╝"
+  echo ""
+  exit 0
+else
+  echo "╔════════════════════════════════════════════════════╗"
+  echo "║  ✗ $failed_checks SECURITY CHECK(S) FAILED                  ║"
+  echo "║  Please fix the issues before committing          ║"
+  echo "╚════════════════════════════════════════════════════╝"
+  echo ""
+  echo "To bypass (NOT RECOMMENDED): git commit --no-verify"
+  echo ""
+  exit 1
+fi

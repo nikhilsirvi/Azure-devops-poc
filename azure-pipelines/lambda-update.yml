@@ -29,14 +29,6 @@ steps:
   displayName: Build Lambda Package
 
 - task: AWSCLI@1
-  displayName: Test OIDC Identity
-  inputs:
-    awsCredentials: aws-odic-sc
-    regionName: $(AWS_REGION)
-    awsCommand: sts
-    awsSubCommand: get-caller-identity
-
-- task: AWSCLI@1
   displayName: Configure AWS OIDC Connection
   inputs:
     awsCredentials: aws-odic-sc

@@ -1,0 +1,26 @@
+{
+  "app": {
+    "name": "Plantilla de Aplicación React",
+    "tagline": "Construye rápido, lanza con confianza"
+  },
+  "nav": {
+    "dashboard": "Panel",
+    "settings": "Configuración"
+  },
+  "actions": {
+    "goHome": "Ir al inicio",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "refresh": "Actualizar"
+  },
+  "errors": {
+    "notFound": "Página no encontrada",
+    "notFoundMessage": "La página que buscas no existe.",
+    "generic": "Algo salió mal.",
+    "retry": "Por favor, inténtalo de nuevo."
+  },
+  "loading": "Cargando...",
+  "noData": "No hay datos disponibles"
+}

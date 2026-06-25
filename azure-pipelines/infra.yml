@@ -1,89 +1,341 @@
+
+name: $(Build.SourceBranchName)-$(Date:yyyyMMdd).$(Rev:r)
+
 trigger:
   branches:
     include:
       - main
-
   paths:
     include:
       - terraform-infra/**
 
-pool:
-  vmImage: ubuntu-latest
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - terraform-infra/**
 
+# ─────────────────────────────────────────────
+# Variables
+# ─────────────────────────────────────────────
 variables:
-  AWS_REGION: ca-central-1
+  - group: terraform-aws-vars           # Variable group in Azure DevOps Library
+                                        # Should contain: TF_BACKEND_BUCKET,
+                                        #                 TF_BACKEND_KEY,
+                                        #                 TF_BACKEND_REGION
+  - name: AWS_REGION
+    value: ca-central-1
+  - name: TF_VERSION
+    value: 1.9.8
+  - name: TF_WORKING_DIR
+    value: terraform-infra
+  - name: TF_PLAN_FILE
+    value: tfplan
+  - name: isPR
+    value: ${{ eq(variables['Build.Reason'], 'PullRequest') }}
 
-steps:
+# ─────────────────────────────────────────────
+# Stages
+# ─────────────────────────────────────────────
+stages:
 
+# =============================================================================
+# STAGE 1 — Validate (runs on PR and main)
+# =============================================================================
+  - stage: Validate
+    displayName: Validate Terraform
+    jobs:
+      - job: ValidateTerraform
+        displayName: Format & Validate
+        pool:
+          vmImage: ubuntu-latest
 
-#install terraform
-- script: |
-    wget -q https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_linux_amd64.zip
+        steps:
 
-    unzip -o terraform_1.9.8_linux_amd64.zip
+          # -------------------------------------------------------------------
+          # Checkout with submodules
+          # -------------------------------------------------------------------
+          - checkout: self
+            displayName: Checkout repository
+            submodules: recursive
+            persistCredentials: true
 
-    sudo mv -f terraform /usr/local/bin/
+          # -------------------------------------------------------------------
+          # Install Terraform (pinned version)
+          # -------------------------------------------------------------------
+          - script: |
+              set -euo pipefail
+              echo "##[section]Installing Terraform $(TF_VERSION)"
+              wget -q https://releases.hashicorp.com/terraform/$(TF_VERSION)/terraform_$(TF_VERSION)_linux_amd64.zip
+              unzip -o terraform_$(TF_VERSION)_linux_amd64.zip
+              sudo mv -f terraform /usr/local/bin/terraform
+              terraform version
+            displayName: Install Terraform
 
-    terraform version
-  displayName: Install Terraform
+          # -------------------------------------------------------------------
+          # Verify AWS OIDC identity
+          # -------------------------------------------------------------------
+          - task: AWSCLI@1
+            displayName: Verify AWS Identity (OIDC)
+            inputs:
+              awsCredentials: aws-odic-sc
+              regionName: $(AWS_REGION)
+              awsCommand: sts
+              awsSubCommand: get-caller-identity
 
-# Verify AWS OIDC Authentication
-- task: AWSCLI@1
-  displayName: Verify AWS Identity
-  inputs:
-    awsCredentials: aws-odic-sc
-    regionName: $(AWS_REGION)
-    awsCommand: sts
-    awsSubCommand: get-caller-identity
+          # -------------------------------------------------------------------
+          # Terraform Init
+          # -------------------------------------------------------------------
+          - task: AWSShellScript@1
+            displayName: Terraform Init
+            inputs:
+              awsCredentials: aws-odic-sc
+              regionName: $(AWS_REGION)
+              scriptType: inline
+              inlineScript: |
+                set -euo pipefail
+                cd $(TF_WORKING_DIR)
 
-# Terraform Init
-- script: |
-    terraform init
-  workingDirectory: terraform-infra
-  displayName: Terraform Init
+                terraform init \
+                  -input=false \
+                  -backend-config="bucket=$(TF_BACKEND_BUCKET)" \
+                  -backend-config="key=$(TF_BACKEND_KEY)" \
+                  -backend-config="region=$(TF_BACKEND_REGION)"
+            env:
+              AWS_REGION: $(AWS_REGION)
 
-# Terraform Format Check
-- script: |
-    terraform fmt -check -recursive
-  workingDirectory: terraform-infra
-  displayName: Terraform Format Check
+          # -------------------------------------------------------------------
+          # Terraform Format Check
+          # -------------------------------------------------------------------
+          - script: |
+              set -euo pipefail
+              cd $(TF_WORKING_DIR)
+              echo "##[section]Checking Terraform formatting..."
+              terraform fmt -check -recursive -diff
+            displayName: Terraform Format Check
 
-# Terraform Validate
-- script: |
-    terraform validate
-  workingDirectory: terraform-infra
-  displayName: Terraform Validate
+          # -------------------------------------------------------------------
+          # Terraform Validate
+          # -------------------------------------------------------------------
+          - task: AWSShellScript@1
+            displayName: Terraform Validate
+            inputs:
+              awsCredentials: aws-odic-sc
+              regionName: $(AWS_REGION)
+              scriptType: inline
+              inlineScript: |
+                set -euo pipefail
+                cd $(TF_WORKING_DIR)
+                terraform validate
+            env:
+              AWS_REGION: $(AWS_REGION)
 
-# Terraform Plan
-- task: AWSShellScript@1
-  displayName: Terraform Plan
-  inputs:
-    awsCredentials: aws-odic-sc
-    regionName: $(AWS_REGION)
-    scriptType: inline
-    inlineScript: |
-      cd terraform-infra
+# =============================================================================
+# STAGE 2 — Plan (runs on PR and main)
+# =============================================================================
+  - stage: Plan
+    displayName: Terraform Plan
+    dependsOn: Validate
+    condition: succeeded()
+    jobs:
+      - job: TerraformPlan
+        displayName: Generate Plan
+        pool:
+          vmImage: ubuntu-latest
 
-      terraform plan \
-        -out=tfplan \
-        -input=false
-  env:
-    AWS_REGION: $(AWS_REGION)
+        steps:
 
-# Terraform Apply
-- task: AWSShellScript@1
-  displayName: Terraform Apply
-  inputs:
-    awsCredentials: aws-odic-sc
-    regionName: $(AWS_REGION)
-    scriptType: inline
-    inlineScript: |
-      cd terraform-infra
+          - checkout: self
+            displayName: Checkout repository
+            submodules: recursive
+            persistCredentials: true
 
-      terraform apply \
-        -auto-approve \
-        -input=false \
-        tfplan
-  env:
-    AWS_REGION: $(AWS_REGION)
- 
+          - script: |
+              set -euo pipefail
+              wget -q https://releases.hashicorp.com/terraform/$(TF_VERSION)/terraform_$(TF_VERSION)_linux_amd64.zip
+              unzip -o terraform_$(TF_VERSION)_linux_amd64.zip
+              sudo mv -f terraform /usr/local/bin/terraform
+              terraform version
+            displayName: Install Terraform
+
+          - task: AWSShellScript@1
+            displayName: Terraform Init
+            inputs:
+              awsCredentials: aws-odic-sc
+              regionName: $(AWS_REGION)
+              scriptType: inline
+              inlineScript: |
+                set -euo pipefail
+                cd $(TF_WORKING_DIR)
+                terraform init \
+                  -input=false \
+                  -backend-config="bucket=$(TF_BACKEND_BUCKET)" \
+                  -backend-config="key=$(TF_BACKEND_KEY)" \
+                  -backend-config="region=$(TF_BACKEND_REGION)"
+            env:
+              AWS_REGION: $(AWS_REGION)
+
+          # -------------------------------------------------------------------
+          # Terraform Plan — saves plan file as artifact
+          # -------------------------------------------------------------------
+          - task: AWSShellScript@1
+            displayName: Terraform Plan
+            inputs:
+              awsCredentials: aws-odic-sc
+              regionName: $(AWS_REGION)
+              scriptType: inline
+              inlineScript: |
+                set -euo pipefail
+                cd $(TF_WORKING_DIR)
+
+                terraform plan \
+                  -input=false \
+                  -out=$(TF_PLAN_FILE) \
+                  -detailed-exitcode \
+                  2>&1 | tee plan-output.txt
+
+                EXIT_CODE=${PIPESTATUS[0]}
+
+                # Exit code 0 = no changes, 2 = changes present, 1 = error
+                if [ $EXIT_CODE -eq 1 ]; then
+                  echo "##[error]Terraform plan failed."
+                  exit 1
+                elif [ $EXIT_CODE -eq 0 ]; then
+                  echo "##vso[task.setvariable variable=TF_PLAN_HAS_CHANGES;isOutput=true]false"
+                  echo "##[section]No infrastructure changes detected."
+                else
+                  echo "##vso[task.setvariable variable=TF_PLAN_HAS_CHANGES;isOutput=true]true"
+                  echo "##[section]Infrastructure changes detected."
+                fi
+            name: TerraformPlanStep
+            env:
+              AWS_REGION: $(AWS_REGION)
+
+          # -------------------------------------------------------------------
+          # Publish plan file as pipeline artifact (reused in Apply stage)
+          # -------------------------------------------------------------------
+          - task: PublishPipelineArtifact@1
+            displayName: Publish Terraform Plan Artifact
+            inputs:
+              targetPath: $(TF_WORKING_DIR)/$(TF_PLAN_FILE)
+              artifact: terraform-plan
+              publishLocation: pipeline
+
+          # -------------------------------------------------------------------
+          # Publish human-readable plan output
+          # -------------------------------------------------------------------
+          - task: PublishPipelineArtifact@1
+            displayName: Publish Plan Output (readable)
+            inputs:
+              targetPath: $(TF_WORKING_DIR)/plan-output.txt
+              artifact: terraform-plan-output
+              publishLocation: pipeline
+
+# =============================================================================
+# STAGE 3 — Apply (only on main branch, requires manual approval)
+# =============================================================================
+  - stage: Apply
+    displayName: Terraform Apply
+    dependsOn: Plan
+    # Only apply on main branch, not on PRs
+    condition: |
+      and(
+        succeeded(),
+        eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+        eq(variables['Build.Reason'], 'IndividualCI')
+      )
+
+    jobs:
+      # -----------------------------------------------------------------------
+      # Manual approval gate before Apply
+      # Set up in: Azure DevOps → Environments → terraform-apply → Approvals
+      # -----------------------------------------------------------------------
+      - deployment: ApplyTerraform
+        displayName: Apply Infrastructure Changes
+        pool:
+          vmImage: ubuntu-latest
+        environment: terraform-apply       # Create this environment in Azure DevOps
+                                           # and add approval checks on it
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+
+                - checkout: self
+                  displayName: Checkout repository
+                  submodules: recursive
+                  persistCredentials: true
+
+                - script: |
+                    set -euo pipefail
+                    wget -q https://releases.hashicorp.com/terraform/$(TF_VERSION)/terraform_$(TF_VERSION)_linux_amd64.zip
+                    unzip -o terraform_$(TF_VERSION)_linux_amd64.zip
+                    sudo mv -f terraform /usr/local/bin/terraform
+                    terraform version
+                  displayName: Install Terraform
+
+                - task: AWSShellScript@1
+                  displayName: Terraform Init
+                  inputs:
+                    awsCredentials: aws-odic-sc
+                    regionName: $(AWS_REGION)
+                    scriptType: inline
+                    inlineScript: |
+                      set -euo pipefail
+                      cd $(TF_WORKING_DIR)
+                      terraform init \
+                        -input=false \
+                        -backend-config="bucket=$(TF_BACKEND_BUCKET)" \
+                        -backend-config="key=$(TF_BACKEND_KEY)" \
+                        -backend-config="region=$(TF_BACKEND_REGION)"
+                  env:
+                    AWS_REGION: $(AWS_REGION)
+
+                # -------------------------------------------------------------
+                # Download the exact plan artifact generated in Plan stage
+                # -------------------------------------------------------------
+                - task: DownloadPipelineArtifact@2
+                  displayName: Download Terraform Plan Artifact
+                  inputs:
+                    artifact: terraform-plan
+                    path: $(TF_WORKING_DIR)
+
+                # -------------------------------------------------------------
+                # Terraform Apply using the saved plan (no surprises)
+                # -------------------------------------------------------------
+                - task: AWSShellScript@1
+                  displayName: Terraform Apply
+                  inputs:
+                    awsCredentials: aws-odic-sc
+                    regionName: $(AWS_REGION)
+                    scriptType: inline
+                    inlineScript: |
+                      set -euo pipefail
+                      cd $(TF_WORKING_DIR)
+
+                      terraform apply \
+                        -auto-approve \
+                        -input=false \
+                        $(TF_PLAN_FILE)
+                  env:
+                    AWS_REGION: $(AWS_REGION)
+
+                # -------------------------------------------------------------
+                # Show outputs after apply
+                # -------------------------------------------------------------
+                - task: AWSShellScript@1
+                  displayName: Terraform Output
+                  inputs:
+                    awsCredentials: aws-odic-sc
+                    regionName: $(AWS_REGION)
+                    scriptType: inline
+                    inlineScript: |
+                      set -euo pipefail
+                      cd $(TF_WORKING_DIR)
+                      echo "##[section]Terraform Outputs:"
+                      terraform output
+                  env:
+                    AWS_REGION: $(AWS_REGION)
+                  condition: succeeded()

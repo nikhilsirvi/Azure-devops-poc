@@ -1,0 +1,20 @@
+{
+  "title": "Tableau de Bord",
+  "metrics": {
+    "totalRevenue": "Revenus Totaux",
+    "activeUsers": "Utilisateurs Actifs",
+    "conversionRate": "Taux de Conversion",
+    "avgOrderValue": "Valeur Moyenne des Commandes"
+  },
+  "charts": {
+    "revenueOverTime": "Revenus dans le Temps",
+    "userGrowth": "Croissance des Utilisateurs",
+    "categoryBreakdown": "Répartition par Catégorie"
+  },
+  "filters": {
+    "dateRange": "Plage de Dates",
+    "last7Days": "7 derniers jours",
+    "last30Days": "30 derniers jours",
+    "last90Days": "90 derniers jours"
+  }
+}
